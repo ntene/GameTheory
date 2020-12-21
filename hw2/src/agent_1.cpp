@@ -26,10 +26,13 @@ void logger(std::string logfile) {
     }
 }
 
-#define MAXNODES 100000
-#define C 1.18f
+#define MAXNODES 200000
+#define C 1.18
+#define C1 1.18
+#define C2 0.01
 #define parent(ptr) (nodes[ptr].p_id)
 #define child(ptr, i) (nodes[ptr].c_id[i])
+#define min(a, b) (a < b ? a : b)
 
 struct Node
 {
@@ -52,8 +55,9 @@ struct Node
 double UCB(int id){
     double range = 14.5;
     double SR = nodes[id].Average / range;
-    double temp = (C * nodes[parent(id)].sqrtNtotal) / nodes[id].sqrtNtotal ;
-    return (nodes[id].depth%2) ?  (SR + temp) : (1.0 - SR);
+    double Vi = nodes[id].Variance + (C1 * nodes[parent(id)].sqrtlogNtotal) / nodes[id].sqrtNtotal ;
+    double temp =  C * (nodes[parent(id)].sqrtlogNtotal / nodes[id].sqrtNtotal) * min(Vi, C2);
+    return (nodes[id].depth%2) ?  (SR + temp) : (1.0 - SR + temp);
 }
 
 int main() {
@@ -124,8 +128,9 @@ int main() {
 
                         }
                         ptr = maxchild;
-                        //flog << "---> ptr " << ptr << std::endl;
                     }
+                    //flog << "---> ptr " << ptr  << "  Variance " << nodes[ptr].Variance << " UCB " << UCB(ptr) << " Average " << nodes[ptr].Average;
+                    //flog << " parent Ntotal " << nodes[parent(ptr)].sqrtNtotal << " Ni "<< nodes[ptr].sqrtNtotal << std::endl;
                     //flog << "ptr == " << ptr <<  "  ptr child " << nodes[ptr].Nchild << "  Win rate  " << UCB(ptr) << std::endl;
                     //expansion
                     if(nodes[ptr].Nchild == 0){
@@ -177,20 +182,6 @@ int main() {
                                 sb.do_move(s_move);
                                 sb.update_status();
                             }
-
-                            double scores = 0;
-                            Color won = sb.who_won() == RED ? RED : BLUE;
-                            scores = (sb.num_pieces[won] - sb.num_pieces[~won]);
-                            scores += won == RED ? sb.board[35] : sb.board[0];
-                            int avg_pc = 0;
-                            for(int k = 0; k < 36; k++){
-                                if (sb.board[k] != NO_PIECE){
-                                    if (color_of(sb.board[k]) == won){
-                                        avg_pc += type_of(sb.board[k]);
-                                    }
-                                }
-                            }
-                            scores += double (avg_pc / sb.num_pieces[won]);
                             /*for (int k = 0; k < 6; k++){
                                 for(int l = 0; l < 6; l++){
                                     flog << (int) sb.board[k*6+l] << " " ;
@@ -200,6 +191,39 @@ int main() {
                             deltaS += won == RED? scores : -scores;
                             deltaS2 += scores*scores;*/
                             if ((sb.who_won() == RED && start == 'f' )|| (sb.who_won() == BLUE && start != 'f') ){
+                                double scores = 0;
+                                Color won = sb.who_won() == RED ? RED : BLUE;
+                                /*scores += won == RED ? sb.board[35] : sb.board[0];
+                                if (sb.num_pieces[won] - sb.num_pieces[~won] == 6)
+                                    scores = 6;
+                                if (sb.num_pieces[won] == 6){
+                                    if (won == RED){
+                                        scores = sb.board[0] == NO_PIECE? 6 : 0;
+                                    }
+                                    else{
+                                        scores = sb.board[35] == NO_PIECE? 6 : 0;
+                                    }
+                                }*/
+                                scores += (sb.num_pieces[won] - sb.num_pieces[~won]);
+                                if (sb.num_pieces[won] - sb.num_pieces[~won] == 0){
+                                    if (won == RED && sb.board[0] != NO_PIECE)
+                                        scores += (sb.board[35] - sb.board[0]);
+                                    else if(won == BLUE && sb.board[35] != NO_PIECE)
+                                        scores += (sb.board[0] - sb.board[35]);
+                                    //scores += won == RED ? sb.board[35] : sb.board[0];
+                                }
+                                else{
+                                    scores += 6;
+                                }
+                                int avg_pc = 0;
+                                for(int k = 0; k < 36; k++){
+                                    if (sb.board[k] != NO_PIECE){
+                                        if (color_of(sb.board[k]) == won){
+                                            avg_pc += type_of(sb.board[k]);
+                                        }
+                                    }
+                                }
+                                scores += double (avg_pc / sb.num_pieces[won]);
                                 deltaS +=  scores;
                                 deltaS2 += scores*scores;
                             }
@@ -216,12 +240,12 @@ int main() {
                         while(1)
                         {
                             nodes[s_now].Ntotal += deltaN;
-                            nodes[s_now].sqrtlogNtotal = sqrt(log((double) nodes[ptr].Ntotal));
+                            nodes[s_now].sqrtNtotal = sqrt((double) nodes[s_now].Ntotal); 
+                            nodes[s_now].sqrtlogNtotal = sqrt(log((double) nodes[s_now].Ntotal));
                             nodes[s_now].Scores += deltaS;
                             nodes[s_now].Sum2 += deltaS2;
-                            nodes[s_now].Average = (double) nodes[s_now].Scores / (double) nodes[s_now].Ntotal;
-                            nodes[s_now].Variance = ((double) nodes[s_now].Sum2 - nodes[s_now].Average * nodes[s_now].Scores) / (double) nodes[s_now].Ntotal;
-                            nodes[s_now].sqrtNtotal = sqrt((double) nodes[s_now].Ntotal); 
+                            nodes[s_now].Average = nodes[s_now].Scores / (double) nodes[s_now].Ntotal;
+                            nodes[s_now].Variance = (nodes[s_now].Sum2 - (nodes[s_now].Scores*nodes[s_now].Scores/nodes[s_now].Ntotal))/nodes[s_now].Ntotal;
                             if (s_now == current)
                                 break;
                             s_now = parent(s_now);
@@ -292,7 +316,8 @@ int main() {
             if (nodes[i].depth > max_depth)
                 max_depth = nodes[i].depth;
         } 
-        flog <<" max depth: " << max_depth << " avg depth " << temp_depth/count << "pv depth " << nodes[current].depth << " avg branching " << (double) temp_b/count << std::endl;
+        flog <<" max depth: " << max_depth << " avg depth " << temp_depth/count << "pv depth " << nodes[current].depth << " avg branching " << (double) temp_b/count;
+        flog << " variance " << nodes[current].Variance << std::endl;
 
     } while (getchar() == 'y');
 
