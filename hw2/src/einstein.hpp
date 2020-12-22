@@ -44,12 +44,9 @@ class Board {
 
     template <Color c>
     void set(std::string init_pc_pos) {
-        assert(init_pc_pos.size() == PIECE_TYPE_NB);
         for (int i = 0; i < PIECE_TYPE_NB; ++i) {
-            put_piece(
-                make_piece(c, PieceType(init_pc_pos[i]-'0')),
-                init_sq_pos[c][i]
-            );
+            put_piece( make_piece(c, PieceType(init_pc_pos[i]-'0')),init_sq_pos[c][i]);
+            //board[] = 
         }
         num_pieces[c] = PIECE_TYPE_NB;
     }
@@ -90,15 +87,10 @@ class Board {
 
     void do_move(Move m) {
         if (m != MOVE_PASS) {
-
-            Color us = sideToMove;
             Square from = from_sq(m);
             Square to = to_sq(m);
             Piece pc = board[from];
             Piece captured = board[to];
-
-            assert(color_of(pc) != COLOR_NONE);
-            assert(color_of(pc) == us);
 
             if (captured != NO_PIECE) {
                 remove_piece(pc, from);
@@ -125,8 +117,6 @@ class Board {
                       abs(to - from) == 1 ? 1 : 2;
 
             ss << type_of(pc) << dir;
-            assert(type_of(pc) >= 0 && type_of(pc) < PIECE_TYPE_NB);
-            assert(dir >= 0 && dir < 3);
         }
 
         return ss.str();
@@ -307,6 +297,7 @@ class Board {
     int gameLength;
     Move hl_move; // highlighted move
     Piece board[SQUARE_NB];
+    int legal_position[2][6];
 
     //Piece initial[SQUARE_NB];
     int num_pieces[COLOR_NB];
