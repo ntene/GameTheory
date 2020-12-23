@@ -16,6 +16,7 @@ class Board {
         state.gameLength = gameLength;
         std::copy(std::begin(board), std::end(board), std::begin(state.board));
         std::copy(std::begin(num_pieces), std::end(num_pieces), std::begin(state.num_pieces));
+        std::copy(std::begin(legal_position), std::end(legal_position), std::begin(state.legal_position));
         return state;
     }
 
@@ -25,6 +26,7 @@ class Board {
         gameLength = state.gameLength;
         std::copy(std::begin(state.board), std::end(state.board), std::begin(board));
         std::copy(std::begin(state.num_pieces), std::end(state.num_pieces), std::begin(num_pieces));
+        std::copy(std::begin(state.legal_position), std::end(state.legal_position), std::begin(legal_position));
     }
 
     void init(std::string topLeft, std::string bottomRight) {
@@ -46,7 +48,9 @@ class Board {
     void set(std::string init_pc_pos) {
         for (int i = 0; i < PIECE_TYPE_NB; ++i) {
             put_piece( make_piece(c, PieceType(init_pc_pos[i]-'0')),init_sq_pos[c][i]);
-            //board[] = 
+            //board[init_sq_pos[c][i]] = 
+            legal_position[c*6 + PieceType(init_pc_pos[i]-'0')] = init_sq_pos[c][i];
+            //std::cerr << "i " << c*6 + PieceType(init_pc_pos[i]-'0') << " position " << init_sq_pos[c][i] <<  std::endl;
         }
         num_pieces[c] = PIECE_TYPE_NB;
     }
@@ -86,6 +90,7 @@ class Board {
     }
 
     void do_move(Move m) {
+        //std::cerr << "before " << std::endl;
         if (m != MOVE_PASS) {
             Square from = from_sq(m);
             Square to = to_sq(m);
@@ -95,6 +100,7 @@ class Board {
             if (captured != NO_PIECE) {
                 remove_piece(pc, from);
                 num_pieces[color_of(captured)]--;
+                legal_position[color_of(captured)*6 + type_of(captured)] = SQ_NONE;
             }
 
             move_piece(pc, from, to);
@@ -102,6 +108,7 @@ class Board {
         sideToMove = ~sideToMove;
         status = (sideToMove == RED) ? Status::RedPlay : Status::BluePlay;
         gameLength++;
+        //std::cerr << "after " << std::endl;
     }
 
     std::string move_to_str(Move m) const {
@@ -132,9 +139,25 @@ class Board {
         constexpr Direction Diag = (Us == RED ? NORTH_EAST : SOUTH_WEST);
         constexpr File Edge = (Us == RED ? FILE_F : FILE_A);
 
-        for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
+        /*for (Square s = SQ_A1; s < SQUARE_NB; ++s) {
             Piece pc = board[s];
             if (color_of(pc) == Us) {
+                if (is_ok(s + Ver)) {
+                    mL[idx++] = make_move(s, s + Ver);
+                }
+                if (file_of(s) != Edge && is_ok(s + Hor)) {
+                    mL[idx++] = make_move(s, s + Hor);
+                }
+                if (file_of(s) != Edge && is_ok(s + Diag)) {
+                    mL[idx++] = make_move(s, s + Diag);
+                }
+            }
+        }*/
+
+        int i = Us;
+        for(int j = 0; j < PIECE_TYPE_NB; j++){
+            Square s = legal_position[i*6 +j];
+            if(s != SQ_NONE){
                 if (is_ok(s + Ver)) {
                     mL[idx++] = make_move(s, s + Ver);
                 }
@@ -150,6 +173,7 @@ class Board {
         if (idx == 0) {
             mL[idx++] = MOVE_PASS;
         }
+        //std::cerr << "movies " << idx << std::endl;
 
         return idx;
     }
@@ -297,7 +321,7 @@ class Board {
     int gameLength;
     Move hl_move; // highlighted move
     Piece board[SQUARE_NB];
-    int legal_position[2][6];
+    Square legal_position[12];
 
     //Piece initial[SQUARE_NB];
     int num_pieces[COLOR_NB];
@@ -312,6 +336,7 @@ class Board {
     inline void move_piece(Piece pc, Square from, Square to) {
         board[from] = NO_PIECE;
         board[to] = pc;
+        legal_position[color_of(pc)*6 + type_of(pc)] = to;
     }
 
     inline void put_piece(Piece pc, Square to) {

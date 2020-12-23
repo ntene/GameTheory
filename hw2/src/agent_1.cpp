@@ -11,7 +11,6 @@
 #include <time.h>
 #include <math.h>
 #include <cstring>
-#include <chrono>
 
 #include "einstein.hpp"
 
@@ -57,7 +56,7 @@ struct Node
 
 
 double UCB(int id){
-    double range = 14.5;
+    double range = 15.5;
     double SR = nodes[id].Average / range;
     double Vi = nodes[id].Variance + (C1 * nodes[parent(id)].sqrtlogNtotal) / nodes[id].sqrtNtotal ;
     double temp =  C * (nodes[parent(id)].sqrtlogNtotal / nodes[id].sqrtNtotal) * min(Vi, C2);
@@ -100,7 +99,7 @@ double calculate_scores(Board sb){
     for(int k = 0; k < 36; k++){
         if (sb.board[k] != NO_PIECE){
             if (color_of(sb.board[k]) == won){
-                avg_pc += type_of(sb.board[k]);
+                avg_pc += (type_of(sb.board[k]) + 1);
             }
         }
     }
@@ -152,8 +151,9 @@ int main() {
                 /*for(int i = 0; i < nodes[current].Nchild; i++){
                     flog << "^ " << nodes[current].c_id[i] << std::endl;
                 }*/
+                auto start_time = std::chrono::steady_clock::now();
                 int Simulations = 0;
-                while(Simulations < 300000){
+                while(Simulations < 4000000){
                     //select
                     //flog << "simulation start " << std::endl;
                     if (count > MAXNODES - 19){
@@ -279,6 +279,9 @@ int main() {
                             }
                         }
                     }
+
+                    if(std::chrono::steady_clock::now() - start_time > std::chrono::seconds(9))
+                        break;
                 }
 
                 double maxW = nodes[nodes[current].c_id[0]].Average;
@@ -294,6 +297,7 @@ int main() {
 
                 move = nodes[maxchild].ply;
                 move_str = b.move_to_str(move);
+                flog << "Simulations " << Simulations << std::endl;
                 flog << "send move ";
                 flog << myTurn << " " << move_str << "scores: " << nodes[maxchild].Average << " UCB " << UCB(maxchild) <<  std::endl;
                 std::cout << move_str << std::flush;

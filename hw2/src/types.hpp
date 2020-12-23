@@ -202,6 +202,7 @@ inline std::ostream& operator<<(std::ostream &os, const Piece &pc) {
 using MoveList = std::array<Move, MAX_MOVES>;
 using PieceList = std::array<int, PIECE_TYPE_NB>;
 
+//[2][6]
 Square init_sq_pos[COLOR_NB][PIECE_TYPE_NB] = {
     {SQ_A1, SQ_B1, SQ_C1, SQ_A2, SQ_B2, SQ_A3},
     {SQ_F4, SQ_E5, SQ_F5, SQ_D6, SQ_E6, SQ_F6}
@@ -219,6 +220,7 @@ struct State
     int gameLength;
     Piece board[SQUARE_NB];
     int num_pieces[COLOR_NB];
+    Square legal_position[12];
 
     bool operator==(const State &other) const{
         if (status == other.status && sideToMove == other.sideToMove && gameLength == other.gameLength){
@@ -229,6 +231,12 @@ struct State
             for(int i = 0; i < COLOR_NB; i++){
                 if(num_pieces[i] != other.num_pieces[i])
                     return false;
+            }
+            for(int i = 0; i < COLOR_NB; i++){
+                for(int j = 0; j < PIECE_TYPE_NB; j++){
+                    if(legal_position[i*6+j] != other.legal_position[i*6+j])
+                        return false;
+                }
             }
             return true;
         }
