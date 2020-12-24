@@ -221,27 +221,6 @@ struct State
     Piece board[SQUARE_NB];
     int num_pieces[COLOR_NB];
     Square legal_position[12];
-
-    bool operator==(const State &other) const{
-        if (status == other.status && sideToMove == other.sideToMove && gameLength == other.gameLength){
-            for(int i = 0; i < SQUARE_NB; i++){
-                if(board[i] != other.board[i])
-                    return false;
-            }
-            for(int i = 0; i < COLOR_NB; i++){
-                if(num_pieces[i] != other.num_pieces[i])
-                    return false;
-            }
-            for(int i = 0; i < COLOR_NB; i++){
-                for(int j = 0; j < PIECE_TYPE_NB; j++){
-                    if(legal_position[i*6+j] != other.legal_position[i*6+j])
-                        return false;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
 };
 
 std::pair<std::string, std::string> shuffle_piece() {

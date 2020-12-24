@@ -100,7 +100,7 @@ int main() {
                 	flog << "^ " << nodes[current].c_id[i] << std::endl;
                 }*/
                 int Simulations = 0;
-                while(Simulations < 150000){
+                while(Simulations < 400000){
                 	//select
                 	int ptr = current;
                 	//flog <<  "-------" << std::endl << "Child  "  << nodes[current].Nchild << " Ntotal  " << nodes[current].Ntotal << "  depth: " << nodes[current].depth << std::endl;

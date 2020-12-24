@@ -25,16 +25,18 @@ void logger(std::string logfile) {
     }
 }
 
-#define MAXNODES 500000
-#define C 1.18
+#define MAXNODES 700000
+#define C 10
 #define C1 1.18
 #define C2 0.01
 #define parent(ptr) (nodes[ptr].p_id)
 #define child(ptr, i) (nodes[ptr].c_id[i])
 #define min(a, b) (a < b ? a : b)
-#define Rd 2
+#define Rd 4
 #define Sd_e 0.2
+#define Mins -15.5
 
+//int pruned = 0;
 struct Node
 {
     Move ply;
@@ -57,7 +59,7 @@ struct Node
 
 double UCB(int id){
     double range = 15.5;
-    double SR = nodes[id].Average / range;
+    double SR = (nodes[id].Average - Mins)/ range;
     double Vi = nodes[id].Variance + (C1 * nodes[parent(id)].sqrtlogNtotal) / nodes[id].sqrtNtotal ;
     double temp =  C * (nodes[parent(id)].sqrtlogNtotal / nodes[id].sqrtNtotal) * min(Vi, C2);
     return (nodes[id].depth%2) ?  (SR + temp) : (1.0 - SR + temp);
@@ -66,6 +68,28 @@ double UCB(int id){
 void update_score(int s_now, double deltaS, double deltaS2, int deltaN, int current){
     while(1)
     {
+        //PP
+        if (nodes[s_now].Ntotal > 500){
+            for(int k = 0; k < nodes[s_now].Nchild; k++){
+                int id = nodes[s_now].c_id[k]; 
+                double l_o = nodes[id].Average - Rd * nodes[id].sd;
+                double r_o = nodes[id].Average + Rd * nodes[id].sd;
+                for(int l = k + 1; l < nodes[s_now].Nchild; l++){
+                    int id_1 = nodes[s_now].c_id[l];
+                    double l_o2 = nodes[id_1].Average - Rd * nodes[id_1].sd;
+                    double r_o2 = nodes[id_1].Average + Rd * nodes[id_1].sd;
+                    if (r_o < l_o2 && nodes[id].sd < Sd_e && nodes[id_1].sd < Sd_e){
+                        nodes[id].pruned = true;
+                        //pruned++;
+                    }
+                    else if(r_o2 < l_o && nodes[id].sd < Sd_e && nodes[id_1].sd < Sd_e){
+                        nodes[id_1].pruned = true;
+                        //pruned++;
+                    }
+
+                }
+            }
+        }
         nodes[s_now].Ntotal += deltaN;
         nodes[s_now].sqrtNtotal = sqrt((double) nodes[s_now].Ntotal); 
         nodes[s_now].sqrtlogNtotal = sqrt(log((double) nodes[s_now].Ntotal));
@@ -107,7 +131,6 @@ double calculate_scores(Board sb){
     //flog << "calculate_scores " << std::endl;
     return scores;
 }
-
 int main() {
     logger(".log.agenta");
     Board b;
@@ -137,7 +160,7 @@ int main() {
         memset(&nodes, 0, sizeof nodes);
         int count = 1;
         int current = 0;
-        int pruned = 0;
+        //pruned = 0;
         nodes[0].state = b.copy_board();
 
         //flog << b;
@@ -153,7 +176,7 @@ int main() {
                 }*/
                 auto start_time = std::chrono::steady_clock::now();
                 int Simulations = 0;
-                while(Simulations < 4000000){
+                while(Simulations < 3000000){
                     //select
                     //flog << "simulation start " << std::endl;
                     if (count > MAXNODES - 19){
@@ -182,41 +205,39 @@ int main() {
                     }
                     //expansion
                     bool jump = false;
-                    if(nodes[ptr].Nchild == 0){
-                        MoveList statemL;
-                        Board state_board;
-                        state_board.copy_state(nodes[ptr].state);
-                        if (state_board.is_terminal()){
-                            jump = true;
-                            int deltaN = 30;
-                            Simulations += deltaN;
+                    MoveList statemL;
+                    Board state_board;
+                    state_board.copy_state(nodes[ptr].state);
+                    if (state_board.is_terminal()){
+                        jump = true;
+                        int deltaN = 50;
+                        Simulations += deltaN;
 
-                            double scores = calculate_scores(state_board);
-                            update_score(ptr, deltaN*scores, deltaN * scores * scores, deltaN, current);
-                            //flog << "this is why" << std::endl;
+                        double scores = calculate_scores(state_board);
+                        update_score(ptr, deltaN*scores, deltaN * scores * scores, deltaN, current);
+                        //flog << "this is why" << std::endl;
+                    }
+                    else{
+                        int state_mL_size;
+                        if (state_board.side_to_move() == RED){
+                            state_mL_size = state_board.legal_actions<RED>(statemL);
                         }
                         else{
-                            int state_mL_size;
-                            if (state_board.side_to_move() == RED){
-                                state_mL_size = state_board.legal_actions<RED>(statemL);
-                            }
-                            else{
-                                state_mL_size = state_board.legal_actions<BLUE>(statemL);
-                            }
-                            for(int i = 0; i < state_mL_size; i++){
-                                state_board.copy_state(nodes[ptr].state);
-                                nodes[count].p_id = ptr;
-                                nodes[count].ply = statemL[i];
-                                nodes[count].depth = nodes[ptr].depth + 1;
-                                state_board.do_move(statemL[i]);
-                                state_board.update_status();
-                                //flog << "test break , current"<< current << std::endl;
-                                nodes[count].state = state_board.copy_board();
-                                nodes[ptr].c_id[i] = count;
-                                count++;
-                            }
-                            nodes[ptr].Nchild = state_mL_size;
+                            state_mL_size = state_board.legal_actions<BLUE>(statemL);
                         }
+                        for(int i = 0; i < state_mL_size; i++){
+                            state_board.copy_state(nodes[ptr].state);
+                            nodes[count].p_id = ptr;
+                            nodes[count].ply = statemL[i];
+                            nodes[count].depth = nodes[ptr].depth + 1;
+                            state_board.do_move(statemL[i]);
+                            state_board.update_status();
+                            //flog << "test break , current"<< current << std::endl;
+                            nodes[count].state = state_board.copy_board();
+                            nodes[ptr].c_id[i] = count;
+                            count++;
+                        }
+                        nodes[ptr].Nchild = state_mL_size;
                     }
 
                     if (!jump){
@@ -224,7 +245,7 @@ int main() {
                         for(int i = 0; i < nodes[ptr].Nchild; i++){
                             double deltaS = 0;
                             double deltaS2 = 0;
-                            int deltaN = 30;
+                            int deltaN = 50;
                             int s_now = nodes[ptr].c_id[i];
                             if (!nodes[s_now].pruned){
                                 for(int j = 0; j < deltaN; j++){
@@ -258,28 +279,6 @@ int main() {
                         }
                     }
 
-                    if (nodes[current].Ntotal > 1000){
-                        for(int k = 0; k < nodes[current].Nchild; k++){
-                            int id = nodes[current].c_id[k]; 
-                            double l_o = nodes[id].Average - Rd * nodes[id].sd;
-                            double r_o = nodes[id].Average + Rd * nodes[id].sd;
-                            for(int l = k + 1; l < nodes[current].Nchild; l++){
-                                int id_1 = nodes[current].c_id[l];
-                                double l_o2 = nodes[id_1].Average - Rd * nodes[id_1].sd;
-                                double r_o2 = nodes[id_1].Average + Rd * nodes[id_1].sd;
-                                if (r_o < l_o2 && nodes[id].sd < Sd_e && nodes[id_1].sd < Sd_e){
-                                    nodes[id].pruned = true;
-                                    pruned++;
-                                }
-                                else if(r_o2 < l_o && nodes[id].sd < Sd_e && nodes[id_1].sd < Sd_e){
-                                    nodes[id_1].pruned = true;
-                                    pruned++;
-                                }
-
-                            }
-                        }
-                    }
-
                     if(std::chrono::steady_clock::now() - start_time > std::chrono::seconds(9))
                         break;
                 }
@@ -309,19 +308,21 @@ int main() {
                 dir = getchar();
                 flog << "receive move ";
                 flog << myTurn << " " << num << " " << dir << std::endl;
+                Move o_ply = b.str_to_move(num, dir);
                 b.do_move(num, dir);
                 b.update_status();
-                State temp_state;
-                temp_state = b.copy_board();
+
                 bool new_state = true;
+                //flog << "current  " << current << std::endl;
                 for(int i = 0; i < nodes[current].Nchild; i++){
                     int temp_c_id = nodes[current].c_id[i];
-                    if(temp_state == nodes[temp_c_id].state){
+                    if(o_ply == nodes[temp_c_id].ply){
                         current = temp_c_id;
                         new_state = false;
                         break;
                     }
                 }
+                //flog << "new current " << current << std::endl;
                 if (new_state){
                     memset(&nodes, 0, sizeof nodes);
                     current = 0;
@@ -334,7 +335,7 @@ int main() {
         }
         flog << "winner: " << b.who_won() << std::endl;
         flog << "tree size: " << count;
-        int temp_depth = 0;
+        /*int temp_depth = 0;
         int temp_b = 0;
         int max_depth = 0;
         for(int i = 0; i < count; i++){
@@ -344,7 +345,7 @@ int main() {
                 max_depth = nodes[i].depth;
         } 
         flog <<" max depth: " << max_depth << " avg depth " << temp_depth/count << "pv depth " << nodes[current].depth << " avg branching " << (double) temp_b/count;
-        flog << " variance " << nodes[current].Variance << " pruned :" << pruned << std::endl;
+        flog << " variance " << nodes[current].Variance << " pruned :" << pruned << std::endl;*/
 
     } while (getchar() == 'y');
 
